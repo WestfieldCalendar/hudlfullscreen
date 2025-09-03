@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hudl HLS Player with Blurred BG & Custom Font</title>
+  <title>Hudl Video Fullscreen</title>
 
-  <!-- Google Font: Montserrat -->
+  <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
@@ -14,59 +14,38 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      background-color: #2e376c; /* dark blue background */
       overflow: hidden;
-      background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
     }
 
-    /* Blurred background video */
-    #bg-video {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      filter: blur(24px) brightness(0.85);
-      transform: scale(1.05);
-      z-index: 0;
-    }
-
-    /* Foreground container */
-    #video-container {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
+    #wrapper {
+      width: 1920px;
+      height: 1080px;
+      transform-origin: top left;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
 
     /* Foreground video */
     #video {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain; /* no cropping */
       background: transparent;
     }
 
     /* Overlay text */
     .overlay-text {
       position: absolute;
-      bottom: 20px;
+      bottom: 40px;
       width: 100%;
       text-align: center;
       font-family: 'Montserrat', sans-serif;
-      font-size: 2.2rem;
+      font-size: 48px;
       font-weight: 700;
       color: #fff;
-      text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-      z-index: 2;
-      padding: 0 1rem;
-      box-sizing: border-box;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
     }
 
     .overlay-text a {
@@ -79,29 +58,22 @@
       text-decoration: underline;
     }
 
-    /* Unmute button */
     #unmute-btn {
       position: absolute;
       top: 12px;
       right: 12px;
-      padding: 10px 16px;
-      font-size: 1rem;
+      padding: 12px 18px;
+      font-size: 20px;
       z-index: 3;
-      cursor: pointer;
       display: none;
+      cursor: pointer;
     }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
-
-  <!-- Blurred background layer -->
-  <video id="bg-video" muted autoplay playsinline></video>
-
-  <!-- Foreground layer -->
-  <button id="unmute-btn">Unmute</button>
-  <div id="video-container">
+  <div id="wrapper">
     <video id="video" muted playsinline></video>
     <div class="overlay-text">
       Watch all the games at
@@ -109,65 +81,52 @@
         https://www.westfieldstateowls.com/HudlPT
       </a>
     </div>
+    <button id="unmute-btn">Unmute</button>
   </div>
 
   <script>
     const streamURL = 'https://vh.hudl.com/7931/698608/7fb/68b76705bd64b42eda2ab7fb/video.live.m3u8';
-    const startTime = 17 * 60; // 17 minutes in seconds
-
-    const fg = document.getElementById('video');
-    const bg = document.getElementById('bg-video');
+    const startTime = 17 * 60; // 17 minutes
+    const video = document.getElementById('video');
     const unmuteBtn = document.getElementById('unmute-btn');
 
-    function attemptPlay(el, showUnmute = false) {
+    // Scale wrapper to fit screen
+    function scaleWrapper() {
+      const scaleX = window.innerWidth / 1920;
+      const scaleY = window.innerHeight / 1080;
+      const scale = Math.min(scaleX, scaleY);
+      document.getElementById('wrapper').style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', scaleWrapper);
+    scaleWrapper();
+
+    function attemptPlay(el, showUnmute=false) {
       el.play().catch(() => {
-        if (showUnmute) unmuteBtn.style.display = 'block';
+        if(showUnmute) unmuteBtn.style.display = 'block';
       });
     }
 
-    function setupHls(el, startAtSeconds = 0, showUnmute = false) {
-      if (window.Hls && Hls.isSupported()) {
-        const h = new Hls({ enableWorker: true });
-        h.loadSource(streamURL);
-        h.attachMedia(el);
-        h.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (startAtSeconds) el.currentTime = startAtSeconds;
-          attemptPlay(el, showUnmute);
-        });
-        return h;
-      } else if (el.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari / iOS: native HLS
-        el.src = streamURL;
-        el.addEventListener('loadedmetadata', () => {
-          if (startAtSeconds) el.currentTime = startAtSeconds;
-          attemptPlay(el, showUnmute);
-        });
-        return null;
-      } else {
-        console.error('HLS not supported in this environment.');
-        return null;
-      }
+    // Setup HLS for VOD
+    if (Hls.isSupported()) {
+      const hls = new Hls({ startPosition: startTime });
+      hls.loadSource(streamURL);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        attemptPlay(video, true);
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamURL;
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = startTime;
+        attemptPlay(video, true);
+      });
     }
 
-    // Foreground video
-    setupHls(fg, startTime, true);
-
-    // Background video
-    setupHls(bg, 0, false);
-
-    // Unmute handler
+    // Unmute button
     unmuteBtn.addEventListener('click', () => {
-      fg.muted = false;
+      video.muted = false;
       unmuteBtn.style.display = 'none';
-      fg.play();
-    });
-
-    // Resume playback when tab becomes active
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        attemptPlay(bg);
-        attemptPlay(fg);
-      }
+      video.play();
     });
   </script>
 </body>
