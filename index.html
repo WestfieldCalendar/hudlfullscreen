@@ -31,7 +31,7 @@
     #video {
       width: 1920px;
       height: 1080px;
-      object-fit: contain; /* no cropping */
+      object-fit: contain; /* prevents cropping */
       background: transparent;
     }
 
@@ -86,11 +86,11 @@
 
   <script>
     const streamURL = 'https://vh.hudl.com/7931/698608/7fb/68b76705bd64b42eda2ab7fb/video.live.m3u8';
-    const startTime = 17 * 60; // 17 minutes
+    const startTime = 17 * 60; // 17 minutes in seconds
     const video = document.getElementById('video');
     const unmuteBtn = document.getElementById('unmute-btn');
 
-    // Scale wrapper to fit screen
+    // Scale wrapper to fit any screen
     function scaleWrapper() {
       const scaleX = window.innerWidth / 1920;
       const scaleY = window.innerHeight / 1080;
@@ -106,19 +106,26 @@
       });
     }
 
-    // Setup HLS for VOD
+    // Setup HLS for VOD (BrightSign friendly)
     if (Hls.isSupported()) {
-      const hls = new Hls({ startPosition: startTime });
+      const hls = new Hls();
       hls.loadSource(streamURL);
       hls.attachMedia(video);
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         attemptPlay(video, true);
+        // Seek after playback starts (wait for buffer)
+        setTimeout(() => {
+          video.currentTime = startTime;
+        }, 5000); // 5 sec delay
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamURL;
       video.addEventListener('loadedmetadata', () => {
-        video.currentTime = startTime;
         attemptPlay(video, true);
+        setTimeout(() => {
+          video.currentTime = startTime;
+        }, 5000);
       });
     }
 
