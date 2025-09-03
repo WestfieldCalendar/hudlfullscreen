@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hudl Video Fullscreen</title>
+  <title>Hudl Live Fullscreen</title>
 
   <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #2e376c; /* dark blue background */
+      background-color: #2e376c;
       overflow: hidden;
     }
 
@@ -25,17 +25,15 @@
       position: absolute;
       top: 0;
       left: 0;
+      background-color: #2e376c;
     }
 
-    /* Foreground video */
-    #video {
+    iframe {
       width: 1920px;
       height: 1080px;
-      object-fit: contain; /* prevents cropping */
-      background: transparent;
+      border: none;
     }
 
-    /* Overlay text */
     .overlay-text {
       position: absolute;
       bottom: 40px;
@@ -46,6 +44,7 @@
       font-weight: 700;
       color: #fff;
       text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
+      pointer-events: none; /* avoid clicks blocking video */
     }
 
     .overlay-text a {
@@ -57,40 +56,24 @@
     .overlay-text a:hover {
       text-decoration: underline;
     }
-
-    #unmute-btn {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      padding: 12px 18px;
-      font-size: 20px;
-      z-index: 3;
-      display: none;
-      cursor: pointer;
-    }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
   <div id="wrapper">
-    <video id="video" muted playsinline></video>
+    <iframe 
+      src="https://vcloud.hudl.com/broadcast/embed/2521751?autoplay=1" 
+      allow="autoplay; fullscreen" 
+      scrolling="no">
+    </iframe>
     <div class="overlay-text">
-      Watch all the games at
+      Watch all the games at 
       <a href="https://www.westfieldstateowls.com/HudlPT" target="_blank" rel="noopener">
         https://www.westfieldstateowls.com/HudlPT
       </a>
     </div>
-    <button id="unmute-btn">Unmute</button>
   </div>
 
   <script>
-    const streamURL = 'https://vh.hudl.com/7931/698608/7fb/68b76705bd64b42eda2ab7fb/video.live.m3u8';
-    const startTime = 17 * 60; // 17 minutes in seconds
-    const video = document.getElementById('video');
-    const unmuteBtn = document.getElementById('unmute-btn');
-
-    // Scale wrapper to fit any screen
     function scaleWrapper() {
       const scaleX = window.innerWidth / 1920;
       const scaleY = window.innerHeight / 1080;
@@ -99,42 +82,6 @@
     }
     window.addEventListener('resize', scaleWrapper);
     scaleWrapper();
-
-    function attemptPlay(el, showUnmute=false) {
-      el.play().catch(() => {
-        if(showUnmute) unmuteBtn.style.display = 'block';
-      });
-    }
-
-    // Setup HLS for VOD (BrightSign friendly)
-    if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(streamURL);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        attemptPlay(video, true);
-        // Seek after playback starts (wait for buffer)
-        setTimeout(() => {
-          video.currentTime = startTime;
-        }, 5000); // 5 sec delay
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamURL;
-      video.addEventListener('loadedmetadata', () => {
-        attemptPlay(video, true);
-        setTimeout(() => {
-          video.currentTime = startTime;
-        }, 5000);
-      });
-    }
-
-    // Unmute button
-    unmuteBtn.addEventListener('click', () => {
-      video.muted = false;
-      unmuteBtn.style.display = 'none';
-      video.play();
-    });
   </script>
 </body>
 </html>
