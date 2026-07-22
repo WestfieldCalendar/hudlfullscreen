@@ -89,21 +89,41 @@
     window.addEventListener('resize', scaleWrapper);
     scaleWrapper();
 
-    // ---- CSV parsing (simple, handles quoted commas) ----
+    // ---- CSV parsing (handles quoted fields and empty fields correctly) ----
+    function splitCSVLine(line) {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += char;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    }
+
     function parseCSV(text) {
       const lines = text.trim().split(/\r?\n/);
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const headers = splitCSVLine(lines[0]).map(h => h.toLowerCase());
       const rows = [];
       for (let i = 1; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
-        const cells = lines[i].match(/(".*?"|[^,]+)(?=,|$)/g) || [];
+        const cells = splitCSVLine(lines[i]);
         const row = {};
         headers.forEach((h, idx) => {
-          let val = (cells[idx] || '').trim();
-          if (val.startsWith('"') && val.endsWith('"')) {
-            val = val.slice(1, -1);
-          }
-          row[h] = val;
+          row[h] = cells[idx] || '';
         });
         rows.push(row);
       }
