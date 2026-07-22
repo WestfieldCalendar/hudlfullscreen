@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hudl Live Fullscreen</title>
-
   <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
-
   <style>
     html, body {
       margin: 0;
@@ -17,7 +15,6 @@
       background-color: #2e376c;
       overflow: hidden;
     }
-
     #wrapper {
       width: 1920px;
       height: 1080px;
@@ -27,13 +24,11 @@
       left: 0;
       background-color: #2e376c;
     }
-
     iframe {
       width: 1920px;
       height: 1080px;
       border: none;
     }
-
     .overlay-text {
       position: absolute;
       bottom: 40px;
@@ -46,13 +41,12 @@
       text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
       pointer-events: none; /* avoid clicks blocking video */
     }
-
     .overlay-text a {
       color: #4da6ff;
       text-decoration: none;
       font-weight: 700;
+      pointer-events: auto;
     }
-
     .overlay-text a:hover {
       text-decoration: underline;
     }
@@ -60,13 +54,13 @@
 </head>
 <body>
   <div id="wrapper">
-    <iframe 
-      src="https://vcloud.hudl.com/broadcast/embed/3791865?autoplay=1" 
-      allow="autoplay; fullscreen" 
+    <iframe id="broadcast-frame"
+      src=""
+      allow="autoplay; fullscreen"
       scrolling="no">
     </iframe>
-    <div class="overlay-text">
-      Live Now |  
+    <div class="overlay-text" id="overlay-text">
+      Live Now |
       <a href="https://www.westfieldstateowls.com/HudlPT" target="_blank" rel="noopener">
         #LetsGoOwls
       </a>
@@ -74,6 +68,18 @@
   </div>
 
   <script>
+    // ---- CONFIG ----
+    const CSV_URL = 'schedule.csv';       // schedule file, same repo/folder
+    const SCHEDULE_REFRESH_MS = 5 * 60 * 1000; // re-fetch CSV every 5 minutes
+    const SELECTION_CHECK_MS = 30 * 1000;      // re-evaluate which event to show every 30s
+
+    let schedule = [];       // parsed events: {id, title, start, end}
+    let currentEventId = null;
+
+    const frame = document.getElementById('broadcast-frame');
+    const overlayText = document.getElementById('overlay-text');
+
+    // ---- Wrapper scaling for signage displays ----
     function scaleWrapper() {
       const scaleX = window.innerWidth / 1920;
       const scaleY = window.innerHeight / 1080;
@@ -82,6 +88,81 @@
     }
     window.addEventListener('resize', scaleWrapper);
     scaleWrapper();
+
+    // ---- CSV parsing (simple, handles quoted commas) ----
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cells = lines[i].match(/(".*?"|[^,]+)(?=,|$)/g) || [];
+        const row = {};
+        headers.forEach((h, idx) => {
+          let val = (cells[idx] || '').trim();
+          if (val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1);
+          }
+          row[h] = val;
+        });
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    async function loadSchedule() {
+      try {
+        const res = await fetch(`${CSV_URL}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+        const text = await res.text();
+        const rows = parseCSV(text);
+        schedule = rows
+          .filter(r => r.id && r.start)
+          .map(r => ({
+            id: r.id.trim(),
+            title: r.title ? r.title.trim() : '',
+            start: new Date(r.start.trim())
+          }))
+          .filter(r => !isNaN(r.start.getTime()));
+        updateSelection();
+      } catch (err) {
+        console.error('Failed to load schedule.csv', err);
+      }
+    }
+
+    function pickEvent() {
+      const now = new Date();
+
+      // An event is "live" from its start time until the next event's start
+      // (or indefinitely, if it's the last/most recent one to have started).
+      const sorted = [...schedule].sort((a, b) => a.start - b.start);
+      const started = sorted.filter(e => now >= e.start);
+      if (started.length) return started[started.length - 1];
+
+      // Nothing has started yet — show the soonest upcoming event.
+      const upcoming = sorted.filter(e => e.start > now);
+      if (upcoming.length) return upcoming[0];
+
+      return null;
+    }
+
+    function updateSelection() {
+      const event = pickEvent();
+      if (!event) return; // no schedule data at all; leave iframe as-is
+
+      if (event.id !== currentEventId) {
+        currentEventId = event.id;
+        frame.src = `https://vcloud.hudl.com/broadcast/embed/${event.id}?autoplay=1`;
+      }
+
+      overlayText.innerHTML = `${event.title ? event.title + ' — ' : ''}Live Now | ` +
+        `<a href="https://www.westfieldstateowls.com/HudlPT" target="_blank" rel="noopener">#LetsGoOwls</a>`;
+    }
+
+    // ---- Init ----
+    loadSchedule();
+    setInterval(loadSchedule, SCHEDULE_REFRESH_MS);
+    setInterval(updateSelection, SELECTION_CHECK_MS);
   </script>
 </body>
 </html>
