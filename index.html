@@ -153,15 +153,17 @@ function pickEvent() {
   const now = new Date();
   const sorted = [...schedule].sort((a, b) => a.start - b.start);
 
-  const BUFFER_MS = 60 * 60 * 1000; // 1 hour
+  const BUFFER_MS = 3 * 60 * 60 * 1000;
 
   for (const event of sorted) {
     const eventEnd = new Date(event.start.getTime() + BUFFER_MS);
 
+    // Show the event if we're still within its 3-hour window
     if (now >= event.start && now < eventEnd) {
       return event;
     }
 
+    // Otherwise show the next upcoming event
     if (event.start > now) {
       return event;
     }
